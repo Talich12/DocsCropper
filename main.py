@@ -26,7 +26,7 @@ def get_angle(normal, vector):
 def check_rotate(image, left, top):
     if not left or not top:
         return None
-    if abs(left[0] - top[0]) < 100 or abs(left[1] - top[1]) < 100:
+    if abs(left[0] - top[0]) < 150 or abs(left[1] - top[1]) < 150:
         return None
     height, width = image.shape[:2]
 
@@ -43,7 +43,29 @@ def check_rotate(image, left, top):
     if angle > 20:
         return (90 - angle) * -1
     return None
+    
 
+def check_rescan(image, cropped_image):
+    # Загрузка изображений
+    img1 = cropped_image
+    img2 = image
+    
+    # Получение размеров изображений
+    height1, width1 = img1.shape[:2]
+    height2, width2 = img2.shape[:2]
+    
+    # Расчет отношения размеров
+    area1 = width1 * height1
+    area2 = width2 * height2
+    
+    # Расчет отношения площади в процентах
+    ratio = (area1 / area2) * 100
+    
+    print(ratio)
+    if ratio < 70:
+        return True
+
+    return False
 def rotate(image, angle, center):
     # Получение размеров изображения
     height, width = image.shape[:2]
@@ -89,15 +111,23 @@ def count_pixels(image, x, y, kernel_size=3, threshold=6):
 def find_doc(filename, time):
     if isinstance(filename, str):
         color_image = cv2.imread(filename)
-        color_image = crop_image(color_image, 30)
+        #color_image = crop_image(color_image, 30)
     else:
         color_image = filename
 
     gray_image = cv2.cvtColor(color_image, cv2.COLOR_BGR2GRAY)
 
 
-    _, binary_image = cv2.threshold(gray_image, 220, 255, cv2.THRESH_BINARY)
+    _, binary_image = cv2.threshold(gray_image, 245, 255, cv2.THRESH_BINARY)
+    cv2.imwrite("binary.jpg", binary_image)
+    kernel = np.ones((3, 3), np.uint8)
 
+    eroded_image = cv2.erode(binary_image, kernel, iterations=1)
+
+    cv2.imwrite("eroded.jpg", eroded_image)
+    kernel = np.ones((4, 4), np.uint8)
+    # Применяем дилатацию
+    binary_image = cv2.dilate(eroded_image, kernel, iterations=1)
 
     height, width = binary_image.shape[:2]
 
@@ -112,7 +142,7 @@ def find_doc(filename, time):
     for y in range(height):  # Перебор строк
         for x in range(width):  # Перебор столбцов
             if binary_image[y, x] == 0:
-                if count_pixels(binary_image, x, y, 3, 12):
+                if count_pixels(binary_image, x, y, 5, 100):
                     # Обновление минимальных координат
                     if x < min_x:
                         min_x = x
@@ -131,7 +161,9 @@ def find_doc(filename, time):
 
     cropped_image = color_image[min_y:max_y, min_x:max_x]
     cv2.imwrite("cropped_image.jpg", cropped_image)
-    cv2.imwrite("binry.jpg", binary_image)
+    cv2.imwrite("dilated.jpg", binary_image)
+    #cv2.circle(color_image, (left[0], left[1]), 5, (0, 255, 0), thickness=5, lineType=cv2.LINE_AA)
+    #cv2.circle(color_image, (top[0], top[1]), 5, (0, 0, 255), thickness=5, lineType=cv2.LINE_AA)
     cv2.imwrite("color.jpg", color_image)
     
     angle = check_rotate(color_image, left, top)
@@ -140,8 +172,11 @@ def find_doc(filename, time):
         rotated_image =rotate(color_image, angle, center)
         #print() 
         cropped_image = find_doc(rotated_image, 1)
+
+    if check_rescan(color_image, cropped_image):
+        print(f"Rescan!!!")
     return cropped_image
 
 if __name__ == "__main__":
-    #find_doc("./input/test6.jpg", 0)
-    test("./input", "./output")
+    find_doc("./input/Гончарова Елена Сергеевна_pages-to-jpg-0002.jpg", 0)
+    #test("./input", "./output")
